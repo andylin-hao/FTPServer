@@ -1,0 +1,1 @@
+/usr/bin/cc -g   CMakeFiles/FTPServer.dir/main.c.o CMakeFiles/FTPServer.dir/network.c.o CMakeFiles/FTPServer.dir/utils.c.o  -o FTPServer 
