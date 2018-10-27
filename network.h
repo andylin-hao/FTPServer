@@ -8,6 +8,8 @@
 #include "global.h"
 #include "utils.h"
 
+int initServer();
+
 void acceptConnection(int socketFd, const char* type, int index);
 
 void disconnectCommand(int index);
@@ -18,8 +20,12 @@ void disconnectListen(int index);
 
 void disconnect(int index);
 
-void commandResponse(int i);
+void commandResponse(int index);
 
-void fileTranserResponse(int i);
+void fileTransferResponse(int index);
+
+void dataResponse(int index);
+
+int createListeningConn(int port, int index);
 
 #endif //FTPSERVER_NETWORK_H

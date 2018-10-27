@@ -11,11 +11,11 @@ char** parseCommand(char* command);
 
 char* processMsg(char* msg, int index);
 
+char* generateData(int state, int index);
+
 void upper(char* string);
 
 int removeDir(const char *dir);
-
-int getFileInfo(char *dir);
 
 void initClients();
 
@@ -50,5 +50,9 @@ char* rmd(char* content, int index);
 char* rnfr(char* content, int index);
 
 char* rnto(char* content, int index);
+
+char* sendFile(int index);
+
+char* sendList(int index);
 
 #endif //FTPSERVER_UTILS_H
