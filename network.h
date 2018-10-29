@@ -28,4 +28,6 @@ void dataResponse(int index);
 
 int createListeningConn(int port, int index);
 
+int connectToClient(int index);
+
 #endif //FTPSERVER_NETWORK_H

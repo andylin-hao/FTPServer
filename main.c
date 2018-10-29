@@ -7,7 +7,7 @@ void messageLoop() {
         fd_select = fd_read;
 
         // select function that monitor all sockets
-        int error = select(maxfd + 1, &fd_select, NULL, NULL, NULL);
+        int error = select(maxfd + 1, &fd_select, NULL, NULL, &timeout);
         if(error < 0) {
             perror("fail to select");
             return;

@@ -11,6 +11,9 @@ int initServer() {
     }
     int error;
 
+    timeout.tv_usec = 0;
+    timeout.tv_sec = 0;
+
     socklen_t serv_len;
 
     // create TCP socket
@@ -105,6 +108,17 @@ void disconnectCommand(int index) {
 
 void disconnectFileTransfer(int index) {
     if (clients[index].fileTransferCon != -1) {
+        clients[index].mode = 0;
+        clients[index].transferProcess = 0;
+        clients[index].transferState = 0;
+        clients[index].dirPointer = NULL;
+        clients[index].port_port = -1;
+
+        memset(clients[index].port_ip, 0, sizeof(clients[index].port_ip));
+        memset(clients[index].fileName, 0, sizeof(clients[index].fileName));
+        memset(&clients[index].dirState, 0, sizeof(clients[index].dirState));
+        memset(clients[index].dirName, 0, sizeof(clients[index].dirName));
+
         FD_CLR(clients[index].fileTransferCon, &fd_read);
         close(clients[index].fileTransferCon);
         clients[index].fileTransferCon = -1;
@@ -125,6 +139,22 @@ void disconnect(int index) {
     disconnectCommand(index);
     disconnectFileTransfer(index);
     disconnectListen(index);
+
+    clients[index].loginState = 0;
+    clients[index].renameState = 0;
+    clients[index].port = 0;
+    clients[index].transferProcess = 0;
+    clients[index].dirPointer = NULL;
+    clients[index].mode = 0;
+    clients[index].port_port = -1;
+
+    memset(clients[index].port_ip, 0, sizeof(clients[index].port_ip));
+    memset(clients[index].fileName, 0, sizeof(clients[index].fileName));
+    memset(clients[index].renamePath, 0, sizeof(clients[index].renamePath));
+    memset(&clients[index].dirState, 0, sizeof(clients[index].dirState));
+    memset(clients[index].dirName, 0, sizeof(clients[index].dirName));
+    memset(clients[index].directory, 0, sizeof(clients[index].directory));
+    strcpy(clients[index].directory, ROOT);
 }
 
 void commandResponse(int index) {
@@ -158,7 +188,6 @@ void fileTransferResponse(int index) {
                 fwrite(buf, 1, (size_t) num, fp);
                 fclose(fp);
             } else {
-                clients[index].transferState = 0;
                 disconnectFileTransfer(index);
                 return;
             }
@@ -168,12 +197,14 @@ void fileTransferResponse(int index) {
 
 void dataResponse(int index) {
     if (clients[index].transferState == 4) {
-        clients[index].transferState = 0;
+        char msg[] = "226 Data transfer complete\r\n";
+        write(clients[index].commandCon, msg, strlen(msg));
         disconnectFileTransfer(index);
     } else if ((clients[index].transferState == 1 || clients[index].transferState == 2) && clients[index].fileTransferCon != -1) {
         char *data = generateData(1, index);
         if (data) {
             int num = (int) write(clients[index].fileTransferCon, data, (size_t) strlen(data));
+            clients[index].transferProcess += num;
             if (num < strlen(data))
                 perror("Data lost");
         }
@@ -181,11 +212,14 @@ void dataResponse(int index) {
 }
 
 int createListeningConn(int port, int index) {
+    disconnectListen(index);
+    disconnectFileTransfer(index);
+
     int error;
 
     socklen_t serv_len;
 
-    // create TCP socket_ls
+    // create TCP socket
     int socket_ls = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_ls < 0) {
         perror("fail to create socket");
@@ -220,6 +254,45 @@ int createListeningConn(int port, int index) {
     if (maxfd < socket_ls) {
         maxfd = socket_ls;
     }
+
+    return 1;
+}
+
+int connectToClient(int index) {
+    disconnectListen(index);
+    disconnectFileTransfer(index);
+
+    int error;
+
+    socklen_t conn_len;
+
+    // create TCP socket
+    int socket_cl = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_cl < 0) {
+        perror("fail to create socket");
+        return 0;
+    }
+
+    // configure client address
+    memset(&cli_addr, 0, sizeof(cli_addr));
+    cli_addr.sin_family = AF_INET;
+    cli_addr.sin_port = htons((uint16_t )clients[index].port_port);
+    if(inet_pton(AF_INET, clients[index].port_ip, &cli_addr.sin_addr) <= 0) {
+        printf("IP format error");
+        return 0;
+    }
+
+    // connect to client
+    if(connect(socket_cl, (struct sockaddr*)&cli_addr, sizeof(cli_addr)) < 0) {
+        printf("Fail connecting to client");
+        return 0;
+    }
+
+    FD_SET(socket_cl, &fd_read);
+    clients[index].fileTransferCon = socket_cl;
+
+    if(maxfd < socket_cl)
+        maxfd = socket_cl;
 
     return 1;
 }

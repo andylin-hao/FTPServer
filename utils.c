@@ -10,21 +10,26 @@ void initClients() {
         clients[i].commandCon = -1;
         clients[i].fileTransferCon = -1;
         clients[i].listenCon = -1;
-        memset(clients[i].fileName, 0, sizeof(clients[i].fileName));
         clients[i].loginState = 0;
         clients[i].renameState = 0;
         clients[i].port = 0;
-        memset(clients[i].directory, 0, sizeof(clients[i].directory));
-        strcpy(clients[i].directory, ROOT);
-        memset(clients[i].renamePath, 0, sizeof(clients[i].renamePath));
+        clients[i].transferProcess = 0;
         clients[i].dirPointer = NULL;
+        clients[i].mode = 0;
+        clients[i].port_port = -1;
+
+        memset(clients[i].port_ip, 0, sizeof(clients[i].port_ip));
+        memset(clients[i].fileName, 0, sizeof(clients[i].fileName));
+        memset(clients[i].renamePath, 0, sizeof(clients[i].renamePath));
         memset(&clients[i].dirState, 0, sizeof(clients[i].dirState));
         memset(clients[i].dirName, 0, sizeof(clients[i].dirName));
+        memset(clients[i].directory, 0, sizeof(clients[i].directory));
+        strcpy(clients[i].directory, ROOT);
     }
 }
 
 char *processMsg(char *msg, int index) {
-    char **command = parseCommand(msg);
+    parseCommand(msg);
 
     if (!command[0])
         return "500 Please input correct command\r\n";
@@ -33,11 +38,17 @@ char *processMsg(char *msg, int index) {
 
     chdir(clients[index].directory);
 
+    if (clients[index].transferState)
+        return NULL;
+
     if (!strcmp(command[0], "USER"))
         return user(command[1], index);
 
     if (!strcmp(command[0], "PASS"))
         return pass(command[1], index);
+
+    if (clients[index].loginState != 2)
+        return "332 Please login first\r\n";
 
     if (!strcmp(command[0], "RETR"))
         return retr(command[1], index);
@@ -92,7 +103,6 @@ char *generateData(int state, int index) {
         case 2:
             return sendList(index);
         default:
-            clients[index].transferState = 0;
             disconnectFileTransfer(index);
             return "426 Data connection accidentally broke";
     }
@@ -136,11 +146,74 @@ char *pass(char *content, int index) {
 }
 
 char *retr(char *content, int index) {
-    return NULL;
+    if (!content)
+        return "501 Please input correct command argument\r\n";
+    else {
+        struct stat fileState;
+        if (access(content, F_OK | R_OK) || stat(content, &fileState))
+            return "551 File can't be read or does not exist\r\n";
+        else if (!S_ISREG(fileState.st_mode))
+            return "551 Path must be a readable regular file\r\n";
+        else {
+            if(strstr(content, "../"))
+                return "501 Path should not content \"..\"\r\n";
+            if (clients[index].mode == 0)
+                return "425 Data connection has not been established\r\n";
+            else if (clients[index].mode == 1) {
+                int result = connectToClient(index);
+                if (!result)
+                    return "425 Cannot connect to client\r\n";
+                else {
+                    clients[index].transferState = 1;
+                    realpath(content, clients[index].fileName);
+                    return "150 Data connection established, begin transfer\r\n";
+                }
+            } else {
+                if (clients[index].fileTransferCon == -1)
+                    return "425 No data connection\r\n";
+                else {
+                    clients[index].transferState = 1;
+                    realpath(content, clients[index].fileName);
+                    return "150 Data connection established, begin transfer\r\n";
+                }
+            }
+        }
+    }
 }
 
 char *stor(char *content, int index) {
-    return NULL;
+    if (!content)
+        return "501 Please input correct command argument\r\n";
+    else {
+        FILE* fp = fopen(content, "w");
+        if(!fp)
+            return "551 File can't be created\r\n";
+        else {
+            fclose(fp);
+            if(strstr(content, "../"))
+                return "501 Path should not content \"..\"\r\n";
+            if(clients[index].mode == 0)
+                return "425 Data connection has not been established\r\n";
+            if (clients[index].mode == 1) {
+                int result = connectToClient(index);
+                if (!result)
+                    return "425 Cannot connect to client\r\n";
+                else {
+                    clients[index].transferState = 3;
+                    realpath(content, clients[index].fileName);
+                    return "150 Data connection established, begin storing\r\n";
+                }
+            } else {
+                if (clients[index].fileTransferCon == -1)
+                    return "425 No data connection\r\n";
+                else {
+                    clients[index].transferState = 3;
+                    realpath(content, clients[index].fileName);
+                    return "150 Data connection established, begin storing\r\n";
+                }
+            }
+        }
+    }
 }
 
 char *quit(char *content, int index) {
@@ -166,7 +239,20 @@ char *type(char *content, int index) {
 }
 
 char *port(char *content, int index) {
-    return NULL;
+    if (!content)
+        return "501 Please input correct command argument\r\n";
+    else {
+        memset(clients[index].port_ip, 0, sizeof(clients[index].port_ip));
+        int error = parseIP_PORT(content, clients[index].port_ip, &clients[index].port_port);
+        if (error < 0)
+            return "501 Please input correct IP-PORT format\r\n";
+        else {
+            clients[index].mode = 1;
+            disconnectListen(index);
+            disconnectFileTransfer(index);
+            return "200 Prepare to connect to client\r\n";
+        }
+    }
 }
 
 char *pasv(char *content, int index) {
@@ -180,7 +266,7 @@ char *pasv(char *content, int index) {
         int port = (int) (random() % (65535 - 20000 + 1) + 20000);
         int i = 0;
         while (i < MAX_CON) {
-            if(port == clients[i].port){
+            if (port == clients[i].port) {
                 port = (int) (random() % (65535 - 20000 + 1) + 20000);
                 i = 0;
                 continue;
@@ -189,8 +275,8 @@ char *pasv(char *content, int index) {
         }
         char p1[BUF_LEN] = {0};
         char p2[BUF_LEN] = {0};
-        sprintf(p1, "%d", port/256);
-        sprintf(p2, "%d", port%256);
+        sprintf(p1, "%d", port / 256);
+        sprintf(p2, "%d", port % 256);
         strcat(message, ",");
         strcat(message, p1);
         strcat(message, ",");
@@ -199,9 +285,11 @@ char *pasv(char *content, int index) {
 
         int result = createListeningConn(port, index);
         if (!result)
-            return "421 Unable to listen for data connection";
-        else
+            return "421 Unable tclients[index].transferState = 0;o listen for data connection\r\n";
+        else {
+            clients[index].mode = 2;
             return message;
+        }
     }
 }
 
@@ -258,34 +346,31 @@ char *list(char *content, int index) {
         return "501 Please input correct command argument\r\n";
     else {
         if (access(content, F_OK)) {
-            clients[index].transferState = 0;
             disconnectFileTransfer(index);
-            return "450 No such file or directory";
+            return "450 No such file or directory\r\n";
         } else {
             clients[index].transferState = 2;
             if (stat(content, &clients[index].dirState) < 0) {
-                clients[index].transferState = 0;
                 disconnectFileTransfer(index);
-                return "450 Directory or file can't be accessed";
+                return "450 Directory or file can't be accessed\r\n";
             } else {
                 if (S_ISREG(clients[index].dirState.st_mode)) {
                     clients[index].dirPointer = NULL;
                     realpath(content, clients[index].dirName);
                     if (clients[index].fileTransferCon == -1)
-                        return "126 File okay, waiting for data connection";
+                        return "126 File okay, waiting for data connection\r\n";
                     else
                         return "126 File okay";
                 } else if (S_ISDIR(clients[index].dirState.st_mode)) {
                     clients[index].dirPointer = opendir(content);
                     realpath(content, clients[index].dirName);
                     if (clients[index].fileTransferCon == -1)
-                        return "126 Directory okay, waiting for data connection";
+                        return "126 Directory okay, waiting for data connection\r\n";
                     else
-                        return "126 Directory okay";
+                        return "126 Directory okay\r\n";
                 } else {
-                    clients[index].transferState = 0;
                     disconnectFileTransfer(index);
-                    return "450 Unknown file type";
+                    return "450 Unknown file type\r\n";
                 }
             }
         }
@@ -343,7 +428,18 @@ char *rnto(char *content, int index) {
 }
 
 char *sendFile(int index) {
-    return NULL;
+    struct stat fileState;
+    stat(clients[index].fileName, &fileState);
+    if (clients[index].transferProcess >= fileState.st_size) {
+        clients[index].transferState = 4;
+        return NULL;
+    } else {
+        memset(data, 0, sizeof(data));
+        FILE *file = fopen(clients[index].fileName, "r");
+        fseek(file, clients[index].transferProcess, SEEK_SET);
+        fread(data, 1, BUF_LEN, file);
+        return data;
+    }
 }
 
 char *sendList(int index) {
@@ -354,6 +450,7 @@ char *sendList(int index) {
     struct dirent *dp;
     struct stat dirState;
 
+    memset(data, 0, sizeof(data));
     if (S_ISREG(clients[index].dirState.st_mode)) {
         stat(clients[index].dirName, &dirState);
         char *file = strrchr(clients[index].dirName, '/');
@@ -407,11 +504,10 @@ char *sendList(int index) {
     return NULL;
 }
 
-char **parseCommand(char *command) {
-    char **result = (char **) malloc(2 * sizeof(char *));
-    result[0] = strtok(command, " ");
-    result[1] = strtok(NULL, " ");
-    return result;
+void parseCommand(char *arg) {
+    memset(command, 0, sizeof(command));
+    command[0] = strtok(arg, " ");
+    command[1] = strtok(NULL, " ");
 }
 
 
@@ -457,9 +553,38 @@ int removeDir(const char *dir) {
 
         rmdir(dir);
     } else {
-        perror("Unknown file type");
+        perror("Unknown file type\n");
     }
 
+    return 0;
+}
+
+int parseIP_PORT(char *ip_port, char *ip, int *port) {
+    char **ip_port_parse = (char **) malloc(6 * sizeof(char *));
+    memset(ip_port_parse, 0, 6 * sizeof(char *));
+    ip_port_parse[0] = strtok(ip_port, ",");
+    for (int i = 1; i < 6; ++i) {
+        ip_port_parse[i] = strtok(NULL, ",");
+    }
+    for (int i = 0; i < 6; ++i) {
+        if (ip_port_parse[i] == NULL)
+            return -1;
+    }
+    for (int i = 0; i < 4; ++i) {
+        strcat(ip, ip_port_parse[i]);
+        if (i != 3)
+            strcat(ip, ".");
+    }
+    char *ptr = NULL;
+    errno = 0;
+    int p1 = (int) strtol(ip_port_parse[4], &ptr, 10);
+    int p2 = (int) strtol(ip_port_parse[5], &ptr, 10);
+    if ((errno == ERANGE && (p1 == INT_MAX || p1 == INT_MIN)) || (errno != 0 && p1 == 0) ||
+        (errno == ERANGE && (p2 == INT_MAX || p2 == INT_MIN)) || (errno != 0 && p2 == 0)) {
+        perror("parse ip error\n");
+        return -1;
+    }
+    *port = p1 * 256 + p2;
     return 0;
 }
 

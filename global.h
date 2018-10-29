@@ -13,6 +13,7 @@
 #include <regex.h>
 #include <dirent.h>
 #include <time.h>
+#include <limits.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -36,14 +37,16 @@ struct Client {
     int fileTransferCon;             // connections for file transfer
     int loginState;                  // state of login
     int renameState;                 // state of renaming file
-    int mode;                        // 0 for PORT, 1 for PASV
+    int mode;                        // 0 for no PORT or PASV, 1 for PORT, 2 for PASV
+    int port_port;                   // port of PORT command
     int transferState;               // state of transfer, 0 for no transfer, 1 for retrieve, 2 for list, 3 for store, 4 for complete
     int port;                        // port
     int transferProcess;             // the process of file transfer
     DIR* dirPointer;                 // current directory
     struct stat dirState;            // state of directory
+    char port_ip[BUF_LEN];           // ip of PORT command
     char dirName[BUF_LEN];           // directory that will be transfer through LIST
-    char fileName[BUF_LEN];          // file names
+    char fileName[BUF_LEN];          // file name
     char directory[BUF_LEN];         // client's working directory
     char renamePath[BUF_LEN];        // directory of renaming file
 
@@ -64,5 +67,9 @@ int maxfd;                           // max num of file descriptor
 char message[BUF_LEN];               // dynamic message
 
 char data[BUF_LEN];                  // data to transfer
+
+char* command[2];                    // parsed command
+
+struct timeval timeout;              // select timeout
 
 #endif //FTPSERVER_GLOBAL_H

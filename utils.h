@@ -7,7 +7,7 @@
 
 #include "global.h"
 
-char** parseCommand(char* command);
+void parseCommand(char* arg);
 
 char* processMsg(char* msg, int index);
 
@@ -16,6 +16,8 @@ char* generateData(int state, int index);
 void upper(char* string);
 
 int removeDir(const char *dir);
+
+int parseIP_PORT(char *ip_port, char* ip, int* port);
 
 void initClients();
 
