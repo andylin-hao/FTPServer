@@ -82,6 +82,9 @@ char *processMsg(char *msg, int index) {
     if (!strcmp(command[0], "PASS"))
         return pass(command[1], index);
 
+    if (!strcmp(command[0], "QUIT") || !strcmp(command[0], "ABOR"))
+        return quit(command[1], index);
+
     if (clients[index].loginState != 2)
         return "332 Please login first\r\n";
 
@@ -90,9 +93,6 @@ char *processMsg(char *msg, int index) {
 
     if (!strcmp(command[0], "STOR"))
         return stor(command[1], index);
-
-    if (!strcmp(command[0], "QUIT") || !strcmp(command[0], "ABOR"))
-        return quit(command[1], index);
 
     if (!strcmp(command[0], "SYST"))
         return syst(command[1], index);
