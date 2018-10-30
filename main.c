@@ -26,8 +26,6 @@ void messageLoop() {
             if (FD_ISSET(clients[i].listenCon, &fd_select)) {
                 acceptConnection(clients[i].listenCon, "fileTransferCon", i);
                 disconnectListen(i);
-                char msg[] = "125 Data connection established\r\n";
-                write(clients[i].commandCon, msg, (size_t) strlen(msg));
             }
         }
 
@@ -43,8 +41,8 @@ void messageLoop() {
     }
 }
 
-int main() {
-    if (!initServer())
+int main(int argc, const char *argv[]) {
+    if (!initServer(argc, argv))
         return 1;
     messageLoop();
     return 0;

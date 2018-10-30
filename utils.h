@@ -7,11 +7,13 @@
 
 #include "global.h"
 
+int parseArgs(int argc, const char *argv[]);
+
 void parseCommand(char* arg);
 
 char* processMsg(char* msg, int index);
 
-char* generateData(int state, int index);
+int generateData(int state, int index);
 
 void upper(char* string);
 
@@ -53,8 +55,8 @@ char* rnfr(char* content, int index);
 
 char* rnto(char* content, int index);
 
-char* sendFile(int index);
+int sendFile(int index);
 
-char* sendList(int index);
+int sendList(int index);
 
 #endif //FTPSERVER_UTILS_H

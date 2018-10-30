@@ -24,12 +24,12 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 
-#define PORT 8080
 #define MAX_CON 20                   // max num of server connection
 #define BUF_LEN 1024                 // max command length
-#define ROOT "/home/masteryoda/tmp"  // root directory
 #define IP "127,0,0,1"               // local IP address
 
+int PORT;
+char ROOT[BUF_LEN];                  // root directory
 
 struct Client {
     int listenCon;                   // sockets for listening

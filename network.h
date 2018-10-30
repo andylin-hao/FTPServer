@@ -8,7 +8,7 @@
 #include "global.h"
 #include "utils.h"
 
-int initServer();
+int initServer(int argc, const char *argv[]);
 
 void acceptConnection(int socketFd, const char* type, int index);
 

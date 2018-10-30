@@ -4,7 +4,10 @@
 
 #include "network.h"
 
-int initServer() {
+int initServer(int argc, const char *argv[]) {
+    if(parseArgs(argc, argv) < 0)
+        return 0;
+
     if(chdir(ROOT) < 0){
         perror("Change directory fail");
         return 0;
@@ -26,7 +29,7 @@ int initServer() {
     // configure local address
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
+    serv_addr.sin_port = htons((uint16_t) PORT);
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     serv_len = sizeof(serv_addr);
@@ -166,7 +169,7 @@ void commandResponse(int index) {
             printf("receive message from client %d: %s\n", index, buf);
             char *msg = processMsg(buf, index);
             if (msg) {
-                num = (int) write(clients[index].commandCon, msg, (size_t) strlen(msg));
+                num = (int) write(clients[index].commandCon, msg, (size_t ) strlen(msg));
                 if (num < 0) {
                     perror("fail to write");
                 }
@@ -188,6 +191,9 @@ void fileTransferResponse(int index) {
                 fwrite(buf, 1, (size_t) num, fp);
                 fclose(fp);
             } else {
+                char msg[] = "226 Data transfer complete\r\n";
+                write(clients[index].commandCon, msg, strlen(msg));
+                memset(data, 0, sizeof(data));
                 disconnectFileTransfer(index);
                 return;
             }
@@ -199,14 +205,13 @@ void dataResponse(int index) {
     if (clients[index].transferState == 4) {
         char msg[] = "226 Data transfer complete\r\n";
         write(clients[index].commandCon, msg, strlen(msg));
+        memset(data, 0, sizeof(data));
         disconnectFileTransfer(index);
     } else if ((clients[index].transferState == 1 || clients[index].transferState == 2) && clients[index].fileTransferCon != -1) {
-        char *data = generateData(1, index);
-        if (data) {
-            int num = (int) write(clients[index].fileTransferCon, data, (size_t) strlen(data));
+        int size = generateData(clients[index].transferState, index);
+        if (size) {
+            int num = (int) write(clients[index].fileTransferCon, data, (size_t) size);
             clients[index].transferProcess += num;
-            if (num < strlen(data))
-                perror("Data lost");
         }
     }
 }
