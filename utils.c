@@ -204,13 +204,12 @@ char *retr(char *content, int index) {
                     return "150 Data connection established, begin transfer\r\n";
                 }
             } else {
-                if (clients[index].fileTransferCon == -1)
-                    return "425 No data connection\r\n";
-                else {
-                    clients[index].transferState = 1;
-                    realpath(content, clients[index].fileName);
-                    return "150 Data connection established, begin transfer\r\n";
+                if (clients[index].fileTransferCon == -1) {
+                    return "425 Data connection has noe benn established";
                 }
+                clients[index].transferState = 1;
+                realpath(content, clients[index].fileName);
+                return "150 Data connection established, begin transfer\r\n";
             }
         }
     }
@@ -239,13 +238,12 @@ char *stor(char *content, int index) {
                     return "150 Data connection established, begin storing\r\n";
                 }
             } else {
-                if (clients[index].fileTransferCon == -1)
-                    return "425 No data connection\r\n";
-                else {
-                    clients[index].transferState = 3;
-                    realpath(content, clients[index].fileName);
-                    return "150 Data connection established, begin storing\r\n";
+                if (clients[index].fileTransferCon == -1) {
+                    return "425 Data connection has noe benn established";
                 }
+                clients[index].transferState = 3;
+                realpath(content, clients[index].fileName);
+                return "150 Data connection established, begin storing\r\n";
             }
         }
     }
@@ -390,19 +388,42 @@ char *list(char *content, int index) {
                 return "450 Directory or file can't be accessed\r\n";
             } else {
                 if (S_ISREG(clients[index].dirState.st_mode)) {
-                    clients[index].dirPointer = NULL;
-                    realpath(content, clients[index].dirName);
-                    if (clients[index].fileTransferCon == -1)
-                        return "126 File okay, waiting for data connection\r\n";
-                    else
-                        return "150 File okay";
+                    if (clients[index].mode == 0)
+                        return "425 Data connection has not been established\r\n";
+                    else if (clients[index].mode == 1) {
+                        int result = connectToClient(index);
+                        if (!result)
+                            return "425 Cannot connect to client\r\n";
+                        else {
+                            clients[index].dirPointer = NULL;
+                            realpath(content, clients[index].dirName);
+                            return "150 File okay, begin transfer\r\n";
+                        }
+                    } else {
+                        clients[index].dirPointer = NULL;
+                        realpath(content, clients[index].dirName);
+                        return "150 File okay, begin transfer\r\n";
+                    }
                 } else if (S_ISDIR(clients[index].dirState.st_mode)) {
-                    clients[index].dirPointer = opendir(content);
-                    realpath(content, clients[index].dirName);
-                    if (clients[index].fileTransferCon == -1)
-                        return "126 Directory okay, waiting for data connection\r\n";
-                    else
-                        return "150 Directory okay\r\n";
+                    if (clients[index].mode == 0)
+                        return "425 Data connection has not been established\r\n";
+                    else if (clients[index].mode == 1) {
+                        int result = connectToClient(index);
+                        if (!result)
+                            return "425 Cannot connect to client\r\n";
+                        else {
+                            clients[index].dirPointer = opendir(content);
+                            realpath(content, clients[index].dirName);
+                            return "150 Directory okay, begin transfer\r\n";
+                        }
+                    } else {
+                        if (clients[index].fileTransferCon == -1) {
+                            return "425 Data connection has noe benn established";
+                        }
+                        clients[index].dirPointer = opendir(content);
+                        realpath(content, clients[index].dirName);
+                        return "150 Directory okay, begin transfer\r\n";
+                    }
                 } else {
                     disconnectFileTransfer(index);
                     return "450 Unknown file type\r\n";
@@ -488,6 +509,7 @@ int sendList(int index) {
 
     memset(data, 0, sizeof(data));
     if (S_ISREG(clients[index].dirState.st_mode)) {
+        sleep(0);
         stat(clients[index].dirName, &dirState);
         char *file = strrchr(clients[index].dirName, '/');
         if (file)
