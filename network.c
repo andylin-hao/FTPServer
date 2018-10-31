@@ -186,11 +186,10 @@ void fileTransferResponse(int index) {
         char buf[BUF_LEN] = {0};
         if (strcmp(clients[index].fileName, "") != 0) {
             int num = (int) read(clients[index].fileTransferCon, buf, BUF_LEN);
-            if (num) {
-                FILE *fp = fopen(clients[index].fileName, "a");
-                fwrite(buf, 1, (size_t) num, fp);
-                fclose(fp);
-            } else {
+            FILE *fp = fopen(clients[index].fileName, "a");
+            fwrite(buf, 1, (size_t) num, fp);
+            fclose(fp);
+            if (num < BUF_LEN) {
                 char msg[] = "226 Data transfer complete\r\n";
                 write(clients[index].commandCon, msg, strlen(msg));
                 memset(data, 0, sizeof(data));

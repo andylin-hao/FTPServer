@@ -14,6 +14,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <limits.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
