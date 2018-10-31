@@ -182,7 +182,7 @@ void commandResponse(int index) {
 }
 
 void fileTransferResponse(int index) {
-    if (FD_ISSET(clients[index].fileTransferCon, &fd_select) && clients[index].transferState == 3) {
+    if (clients[index].transferState == 3) {
         char buf[BUF_LEN] = {0};
         if (strcmp(clients[index].fileName, "") != 0) {
             int num = (int) read(clients[index].fileTransferCon, buf, BUF_LEN);
@@ -224,7 +224,7 @@ int createListeningConn(int port, int index) {
     socklen_t serv_len;
 
     // create TCP socket
-    int socket_ls = socket(AF_INET, SOCK_STREAM, 0);
+    int socket_ls = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_ls < 0) {
         perror("fail to create socket");
         return 0;
@@ -293,6 +293,7 @@ int connectToClient(int index) {
     }
 
     FD_SET(socket_cl, &fd_read);
+//    ioctl(socket_cl, FIONBIO, 1);
     clients[index].fileTransferCon = socket_cl;
 
     if(maxfd < socket_cl)
